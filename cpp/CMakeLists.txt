@@ -1,0 +1,5 @@
+add_subdirectory(string)
+add_subdirectory(hashmap)
+add_subdirectory(vector)
+add_subdirectory(logger)
+add_subdirectory(sharedptr)

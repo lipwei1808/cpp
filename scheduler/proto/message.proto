@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package Scheduler;
+
+enum MessageType {
+    MESSAGE_TYPE_HEARTBEAT = 1;
+    MESSAGE_TYPE_DATA =  2;
+}
+
+message Message {
+    required MessageType type = 1;
+    optional string data = 2;
+}; 

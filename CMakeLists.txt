@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 
+add_compile_definitions(NDEBUG)
+
 # Option to set the logging level. Default is ERROR_LEVEL.
 option(LOG_LEVEL_OPTION "Set the log level (0=NO_LOG, 1=ERROR_LEVEL, 2=INFO_LEVEL, 3=TRACE_LEVEL)" 1)
 
@@ -28,7 +30,10 @@ else()
 endif()
 
 # Google benchmark
-list(APPEND CMAKE_PREFIX_PATH "~/opt")
+#set(benchmark_DIR "~/opt/lib/benchmark/cmake/benchmark")
+#list(APPEND CMAKE_PREFIX_PATH "~/opt/lib/benchmark")
+list(APPEND CMAKE_PREFIX_PATH "/Users/tanlipwei/opt")
+#list(APPEND CMAKE_PREFIX_PATH "/Users/tanlipwei/opt/protobuf/")
 find_package(benchmark REQUIRED)
 if (benchmark_FOUND)
     message(STATUS "Google benchmark found")
@@ -46,7 +51,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(cpp)
+add_subdirectory(scheduler)
 add_subdirectory(benchmark)
+add_subdirectory(examples)
 
 enable_testing()
 add_subdirectory(tests)

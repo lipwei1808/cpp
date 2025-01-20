@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 
-#include "Hashmap.hpp"
 #include "Logger.hpp"
+#include "Hashmap.hpp"
 
 TEST(HashmapTest, Constructor) {
     Hashmap<int, int> map;

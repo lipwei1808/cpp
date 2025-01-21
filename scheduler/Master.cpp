@@ -80,7 +80,6 @@ bool Master::run() {
     }
 
     // Initialise kqueue
-    int kq;
     struct kevent evSet;
     if ((kq = kqueue()) == -1) {
         LOG_ERROR("Error initialising kqueue %d", errno);
@@ -108,20 +107,13 @@ bool Master::run() {
         }
 
         for (int i = 0; i < nfds; i++) {
+            if (eventList[i].flags & EV_EOF) {
+                handleDisconnect(eventList[i].ident);
+                continue;
+            }
+
             if (eventList[i].ident == fd) {
-                LOG_TRACE("Accepting new connection");
-                sockaddr addr;
-                socklen_t socklen = sizeof(addr);
-                int newFd;
-                if ((newFd = accept(fd, &addr, &socklen)) == -1) {
-                    LOG_ERROR("Error accepting new connection %d", errno);
-                    continue;
-                }
-                LOG_INFO("Accepted new connection fd=%d", newFd);
-                EV_SET(&evSet, newFd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
-                if (kevent(kq, &evSet, 1, nullptr, 0, nullptr) == -1) {
-                    LOG_ERROR("Error in kevent when adding new connection %d", errno);
-                }
+                handleNewConnection();
             } else {
                 handleWorker(eventList[i].ident);
             }
@@ -133,7 +125,11 @@ bool Master::run() {
 void Master::handleWorker(int workerFd) {
     char buffer[MAX_MESSAGE_SIZE];
     ssize_t bytes = recv(workerFd, buffer, MAX_MESSAGE_SIZE, 0);
-    if (bytes <= 0) {
+    if (bytes == 0) {
+        LOG_INFO("Worker disconnected workerFd=%d", workerFd);
+    }
+
+    if (bytes < 0) {
         LOG_ERROR("Error reveiving message. bytes=%zu", bytes);
         return;
     }
@@ -151,6 +147,16 @@ void Master::handleWorker(int workerFd) {
 
     return;
 
+}
+
+void Master::handleDisconnect(int workerFd) {
+    LOG_INFO("Disconnect workerFd=%d", workerFd);
+    struct kevent kev;
+    EV_SET(&kev, workerFd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+    if (kevent(kq, &kev, 1, nullptr, 0, nullptr) == -1) {
+        LOG_ERROR("Error removing worker fd=%d from event list %d", workerFd, errno);
+    }
+    close(workerFd);
 }
 
 bool Master::sendHeartbeat(int workerFd) {
@@ -173,6 +179,23 @@ bool Master::sendHeartbeat(int workerFd) {
     }
 
     return true;
+}
+
+void Master::handleNewConnection() {
+    LOG_TRACE("Accepting new connection");
+    sockaddr addr;
+    socklen_t socklen = sizeof(addr);
+    int newFd;
+    if ((newFd = accept(fd, &addr, &socklen)) == -1) {
+        LOG_ERROR("Error accepting new connection %d", errno);
+        return;
+    }
+    LOG_INFO("Accepted new connection fd=%d", newFd);
+    struct kevent evSet;
+    EV_SET(&evSet, newFd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+    if (kevent(kq, &evSet, 1, nullptr, 0, nullptr) == -1) {
+        LOG_ERROR("Error in kevent when adding new connection %d", errno);
+    }
 }
 
 Master::~Master() {

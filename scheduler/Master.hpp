@@ -10,8 +10,11 @@ public:
 
 private:
     void handleWorker(int workerFd);
+    void handleDisconnect(int workerFd);
+    void handleNewConnection();
     bool sendHeartbeat(int workerFd);
     int fd = 0;
+    int kq = 0;
     const char* hostname;
     const char* port;
 };

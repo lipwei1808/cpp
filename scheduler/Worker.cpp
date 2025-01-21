@@ -15,9 +15,9 @@
 
 Worker::Worker(const char* hostname, const char* port): fd(0), hostname(hostname), port(port) {}
 
-Worker::Worker(Worker&& worker): fd(worker.fd), hostname(worker.hostname), port(worker.port) {
-    LOG_TRACE("Worker constructed");
-    worker.fd = 0;
+Worker::Worker(Worker&& worker): fd(worker.fd), hostname(worker.hostname), port(worker.port),
+       heartbeatThread(std::move(worker.heartbeatThread)) {
+    LOG_TRACE("Worker move constructed");
 }
 
 bool Worker::connect() {
@@ -61,20 +61,14 @@ bool Worker::connect() {
 
 void Worker::runHeartbeat() {
     using namespace std::chrono_literals;
-    int failedCount = 0;
     LOG_INFO("Initialising heartbeat thread");
     while (true) {
         std::this_thread::sleep_for(5s);
         if (!sendHeartbeat()) {
-            failedCount++;
-            if (failedCount > maxHeartbeatRetries) {
-                LOG_ERROR("Failed heartbeat for %d times, exiting worker", maxHeartbeatRetries);
-                break;
-            }
-            continue;
+            break;
         }
-        failedCount = 0;
     }
+    LOG_TRACE("Run heartbeat thread ended");
 }
 
 bool Worker::sendHeartbeat() {
@@ -99,7 +93,11 @@ bool Worker::sendHeartbeat() {
     char buffer[MAX_MESSAGE_SIZE];
     LOG_TRACE("Receiving heartbeat response from master now");
     ssize_t bytes = recv(fd, buffer, MAX_MESSAGE_SIZE, 0);
-    if (bytes <= 0) {
+    if (bytes == 0) {
+        LOG_INFO("Master disconnected!");
+        return false;
+    }
+    if (bytes < 0) {
         LOG_ERROR("Error receiving heartbeat. bytes=%zu. %d: %s", bytes, errno, strerror(errno));
         return false;
     }
@@ -116,6 +114,12 @@ bool Worker::sendHeartbeat() {
 }
 
 Worker::~Worker() {
+    LOG_TRACE("Worker destructor");
+    if (heartbeatThread.joinable()) {
+        LOG_TRACE("heartbeat thread joinable, going to wait to join");
+        heartbeatThread.join();
+    }
     close(fd);
+    LOG_TRACE("Worker destructor completed");
 }
 

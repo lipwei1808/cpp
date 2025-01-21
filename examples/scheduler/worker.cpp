@@ -1,10 +1,20 @@
 #include "Worker.hpp"
+#include "Logger.hpp"
+#include "Vector.hpp"
 
-#include <iostream>
+#include <thread>
 
 int main() {
-    Worker worker{nullptr, "8999"};
-    worker.connect();
-    std::string x;
-    std::cin >> x;
+    Vector<Worker> workers;
+    for (int i = 0; i < 3; i++) {
+        workers.emplace_back(nullptr, "8999");
+    }
+
+    LOG_TRACE("Middle");
+    using namespace std::chrono_literals;
+    for (int i = 0; i < workers.size(); i++) {
+        std::this_thread::sleep_for(2s);
+        workers[i].connect();
+    }
 }
+

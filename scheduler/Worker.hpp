@@ -17,6 +17,5 @@ private:
     const char* hostname = nullptr; 
     const char* port = nullptr;
     std::thread heartbeatThread;
-    int maxHeartbeatRetries = 5;
 };
 

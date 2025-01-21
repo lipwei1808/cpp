@@ -151,6 +151,9 @@ public:
     
     ~Vector() {
         if (ptr) {
+            for (size_t i = 0; i < idx; i++) {
+                ptr[i].~T();
+            }
             ::operator delete(ptr);
         }
     }

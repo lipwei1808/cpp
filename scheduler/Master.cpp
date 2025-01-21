@@ -141,8 +141,18 @@ void Master::handleWorker(int workerFd) {
     }
 
     LOG_TRACE("Master successfully received message from worker");
-    if (message.type() == Scheduler::MessageType::MESSAGE_TYPE_HEARTBEAT) {
-        sendHeartbeat(workerFd);
+    switch (message.type()) {
+        case (Scheduler::MessageType::MESSAGE_TYPE_HEARTBEAT): {
+            sendHeartbeat(workerFd);
+            break;
+        }
+        case (Scheduler::MessageType::MESSAGE_TYPE_HANDSHAKE_REQ): {
+            sendHandshakeResponse(workerFd);
+            break;
+        }
+        default: {
+            break;
+        }
     }
 
     return;
@@ -157,6 +167,36 @@ void Master::handleDisconnect(int workerFd) {
         LOG_ERROR("Error removing worker fd=%d from event list %d", workerFd, errno);
     }
     close(workerFd);
+    workerFds.erase(workerFd);
+}
+
+bool Master::sendHandshakeResponse(int workerFd) {
+    if (!workerFds.contains(workerFd)) {
+        return false;
+    }
+
+    Scheduler::HeartbeatData hData;
+    hData.set_id(workerFds.at(workerFd));
+    std::string serialized;
+    if (!hData.SerializeToString(&serialized)) {
+        LOG_ERROR("Error serializing heartbeat data workerFd=%d, workerId=%d", workerFd, workerFds.at(workerFd));
+        return false;
+    }
+
+    Scheduler::Message msg;
+    msg.set_type(Scheduler::MessageType::MESSAGE_TYPE_HANDSHAKE_RES);
+    msg.set_data(serialized);
+
+    if (!msg.SerializeToString(&serialized)) {
+        LOG_ERROR("Error serializing msg heartbeat data workerFd=%d, workerId=%d", workerFd, workerFds.at(workerFd));
+        return false;
+    }
+
+    if (send(workerFd, serialized.data(), serialized.size(), 0) == -1) {
+        LOG_ERROR("Error sending heartbeat %d: %s", errno, strerror(errno));
+        return false;
+    }
+    return true;
 }
 
 bool Master::sendHeartbeat(int workerFd) {
@@ -190,6 +230,7 @@ void Master::handleNewConnection() {
         LOG_ERROR("Error accepting new connection %d", errno);
         return;
     }
+    workerFds.insert({newFd, newFd});
     LOG_INFO("Accepted new connection fd=%d", newFd);
     struct kevent evSet;
     EV_SET(&evSet, newFd, EVFILT_READ, EV_ADD, 0, 0, nullptr);

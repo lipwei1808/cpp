@@ -30,6 +30,10 @@ public:
         }
         pointer operator->() { return &(*mPtr); }
 
+        Bucket::iterator getBucketIterator() {
+            return mPtr;
+        }
+
         Iterator& operator++() {
             next();
             return *this;
@@ -158,6 +162,36 @@ public:
         }
         auto res = insert({key, V{}});
         return res.first->second;
+    }
+
+    // TODO: unit tests
+    iterator find(const K& key) {
+        size_t hashIdx = std::hash<K>()(key);
+        size_t bucketIdx = hashIdx % mBucketCount;
+        for (auto start = mStore[bucketIdx].begin(); start != mStore[bucketIdx].end(); start++) {
+            if (start->first == key) {
+                return Iterator<false>{start, mStore, bucketIdx, mBucketCount};
+            }
+        }
+        return end();
+    }
+
+    // TODO: unit tests
+    bool contains(const K& key) {
+        return find(key) != end();
+    }
+
+    // TODO: unit tests
+    size_t erase(const K& key) {
+        iterator it = find(key);
+        if (it == end()) {
+            return 0;
+        }
+        size_t hashIdx = std::hash<K>()(key);
+        size_t bucketIdx = hashIdx % mBucketCount;
+        mStore[bucketIdx].erase(it.getBucketIterator());
+        mSize--;
+        return 1;
     }
 
     size_t size() const {

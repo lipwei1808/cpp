@@ -12,10 +12,11 @@ public:
     
 private:
     bool sendHeartbeat();
-
+    bool handshake();
     int fd = 0;
     const char* hostname = nullptr; 
     const char* port = nullptr;
     std::thread heartbeatThread;
+    int id = -1;
 };
 

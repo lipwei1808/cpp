@@ -5,6 +5,12 @@ package Scheduler;
 enum MessageType {
     MESSAGE_TYPE_HEARTBEAT = 1;
     MESSAGE_TYPE_DATA =  2;
+    MESSAGE_TYPE_HANDSHAKE_REQ = 3;
+    MESSAGE_TYPE_HANDSHAKE_RES = 4;
+}
+
+message HeartbeatData {
+    required int32 id = 1;
 }
 
 message Message {

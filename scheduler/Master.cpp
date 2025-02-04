@@ -2,6 +2,7 @@
 #include "Logger.hpp"
 #include "Util.hpp"
 #include "message.pb.h"
+#include "UniquePtr.hpp"
 #include "HeartbeatMonitor.hpp"
 
 #include <arpa/inet.h>
@@ -14,12 +15,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <memory>
 
 using namespace std::chrono_literals;
 Master::Master(const char* hostname, const char* port): fd(0),
         hostname(hostname), port(port),
-        heartbeatMonitor{std::make_unique<HeartbeatMonitor>(this, 20s)} {}
+        heartbeatMonitor{UniquePtr<HeartbeatMonitor>{new HeartbeatMonitor(this, 20s)}} {}
 
 bool Master::init() {
     addrinfo *res, hints, *p;
@@ -103,13 +103,16 @@ bool Master::run() {
 
     int N = 10;
     struct kevent eventList[N];
+    struct timespec timeout;
+    timeout.tv_sec = 5;
+    timeout.tv_nsec = 0;
 
-    bool keepAlive = true;
     LOG_INFO("Master running!");
-    while (keepAlive) {
-        int nfds = kevent(kq, nullptr, 0, eventList, N, nullptr);
+    while (!shutdown) {
+        LOG_TRACE("kevent loop start");
+        int nfds = kevent(kq, nullptr, 0, eventList, N, &timeout);
         LOG_TRACE("kevent loop nfds=%d", nfds);
-        if (nfds < 1) {
+        if (nfds < 0) {
             LOG_ERROR("Error in kevent");
             return false;
         }
@@ -132,6 +135,8 @@ bool Master::run() {
             }
         }
     }
+    LOG_INFO("Master run loop ended!");
+    barrier.arrive_and_wait();
     return true;
 }
  
@@ -293,6 +298,13 @@ bool Master::handleTaskResponse(int workerFd, const std::string& data) {
     return true;
 }
 
+void Master::stop() {
+    shutdown = true;
+    barrier.arrive_and_wait();
+}
+
 Master::~Master() {
+    LOG_TRACE("Master destructor");
     close(fd);
+    heartbeatMonitor->stop();
 }

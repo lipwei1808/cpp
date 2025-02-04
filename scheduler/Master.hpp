@@ -3,6 +3,9 @@
 #include "Distributor.hpp"
 #include "Hashmap.hpp"
 #include "Worker.hpp"
+#include "UniquePtr.hpp"
+
+#include <barrier>
 
 class HeartbeatMonitor;
 class Master {
@@ -11,6 +14,7 @@ public:
     bool init();
     bool listen();
     bool run();
+    void stop();
     ~Master();
 
 private:
@@ -23,12 +27,15 @@ private:
     bool handleTaskResponse(int workerFd, const std::string& data);
     int fd = 0;
     int kq = 0;
+    bool shutdown = false;
     const char* hostname;
     const char* port;
     Hashmap<int, WorkerId> workerFds;
     Hashmap<int, int> clientFds;
     Distributor distributor;
-    std::unique_ptr<HeartbeatMonitor> heartbeatMonitor;
+    UniquePtr<HeartbeatMonitor> heartbeatMonitor;
+    std::barrier<std::function<void()>> barrier{2, []{}};
+
     friend class HeartbeatMonitor;
 };
 

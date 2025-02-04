@@ -151,6 +151,7 @@ public:
         std::swap(idx, vec.idx);
     }
 
+    // TODO: Unit tests for iterator
     template <bool IsConst>
     struct Iterator {
         using iterator_category = std::contiguous_iterator_tag;

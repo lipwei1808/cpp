@@ -50,7 +50,8 @@ void HeartbeatMonitor::svc() {
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(5s);
         std::unique_lock<std::mutex> lock{m};
-        cv.wait(lock, [this]{ return workers.size() != 0; });
+        cv.wait(lock, [this]{ return workers.size() != 0 || shutdown; });
+        if (shutdown) break;
         checkWorkers();
     }
 }
@@ -59,11 +60,16 @@ void HeartbeatMonitor::activate() {
     monitorThread = std::thread{&HeartbeatMonitor::svc, this};
 }
 
-HeartbeatMonitor::~HeartbeatMonitor() {
+void HeartbeatMonitor::stop() {
     shutdown = true;
+    cv.notify_one();
     if (monitorThread.joinable()) {
         monitorThread.join();
     }
     shutdown = false;
+}
+
+HeartbeatMonitor::~HeartbeatMonitor() {
+    stop();
 }
 

@@ -1,10 +1,17 @@
 #include "Master.hpp"
-#include "Worker.hpp"
 #include "Logger.hpp"
 
+#include <csignal>
+
+Master* master1;
+
+void sighandler(int s) {
+    master1->stop();
+}
 
 void masterThread() {
     Master master{nullptr, "8999"};
+    master1 = &master;
     if (!master.init()) {
         LOG_ERROR("Error init master");
         return;
@@ -14,17 +21,11 @@ void masterThread() {
         return;
     }
     master.run();
-}
-
-void workerThread() {
-    Worker worker{"", "8999"};
-    if (!worker.connect()) {
-        LOG_ERROR("Worker connect failed, ending now.");
-    }
+    LOG_INFO("Master thread ending!");
 }
 
 int main() {
-    using namespace std::chrono_literals;
     LOG_INFO("Starting master");
-    masterThread();
+    std::thread t{masterThread};
+    t.join();
 }

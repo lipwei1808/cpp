@@ -17,6 +17,7 @@ public:
     void registerHeartbeat(WorkerId id);
     void addWorker(WorkerId id);
     void svc();
+    void stop();
     void activate();
     void disconnectWorker(WorkerId id);
     ~HeartbeatMonitor();

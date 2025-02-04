@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Hashmap.hpp"
-#include "Logger.hpp"
 #include "Worker.hpp"
 
 #include <chrono>
@@ -25,7 +24,7 @@ public:
 private:
     void checkWorkers();
     Timepoint getNow();
-    inline bool hasExpired(const Timepoint& time, const Timepoint& now);
+    inline bool hasExpired(std::chrono::seconds time);
 
     Master* master = nullptr;
     Hashmap<WorkerId, Timepoint> workers;
@@ -36,10 +35,8 @@ private:
     bool shutdown = false;
 };
 
-inline bool HeartbeatMonitor::hasExpired(const Timepoint& time, const Timepoint& now) {
-    std::chrono::duration x = now - time;
-    LOG_TRACE("now - last heartbeat = %llds", x / std::chrono::seconds{1});
-    return x > expirationTime;
+inline bool HeartbeatMonitor::hasExpired(std::chrono::seconds time) {
+    return time > expirationTime;
 }
 
 

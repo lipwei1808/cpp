@@ -35,7 +35,9 @@ void HeartbeatMonitor::checkWorkers() {
     Vector<WorkerId> disconnectedWorkers;
     for (auto& [k, v]: workers) {
         Timepoint now = getNow();
-        if (hasExpired(v, now)) {
+        std::chrono::seconds x = std::chrono::duration_cast<std::chrono::seconds>(now - v);
+        LOG_TRACE("Worker %d: now - last heartbeat = %llds", k, x.count());
+        if (hasExpired(x)) {
             disconnectedWorkers.push_back(k);
         }
     }

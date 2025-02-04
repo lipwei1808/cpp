@@ -93,6 +93,18 @@ TEST(HashmapTest, Access) {
 
     ASSERT_EQ(map[2], "");
     EXPECT_THROW(map.at(3), std::out_of_range);
+
+    // Should insert default value 
+    Hashmap<int, int> map2;
+    map2[5]; 
+    ASSERT_EQ(map2[5], 0);
+
+    // Should not resize and be able to check key when bucket count is below
+    // hash index
+    Hashmap<int, int> map3;
+    EXPECT_THROW(map3.at(3), std::out_of_range);
+    ASSERT_EQ(map3.size(), 0);
+    ASSERT_EQ(map3.bucket_count(), 0);
 }
 
 TEST(HashmapTest, Rehash) {
@@ -149,4 +161,53 @@ TEST(HashmapTest, Iterator) {
         start++;
     }
     ASSERT_EQ(start, map.end());
+}
+
+TEST(HashmapTest, Find) {
+    Hashmap<std::string, int> map;
+    auto it = map.find("hey");
+    ASSERT_EQ(it, map.end());
+    
+    map.insert({"sup", 99});
+    it = map.find("sup");
+    ASSERT_EQ(it->first, "sup");
+    ASSERT_EQ(it->second, 99);
+
+    it = map.find("not in");
+    ASSERT_EQ(it, map.end());
+
+    map.erase("sup");
+    it = map.find("sup");
+    ASSERT_EQ(it, map.end());
+}
+
+TEST(HashmapTest, Contains) {
+    Hashmap<std::string, int> map;
+    EXPECT_FALSE(map.contains("hello"));
+    map.insert({"hello", 100});
+    EXPECT_TRUE(map.contains("hello"));
+    map.erase("hello");
+    EXPECT_FALSE(map.contains("hello"));
+}
+
+TEST(HashmapTest, Erase) {
+    Hashmap<int, int> map;
+    ASSERT_EQ(map.size(), 0);
+    ASSERT_EQ(map.bucket_count(), 0);
+    map.insert({1, 1});
+    ASSERT_EQ(map.size(), 1);
+    ASSERT_EQ(map.bucket_count(), 1);
+
+    map.erase(1);
+    ASSERT_EQ(map.size(), 0);
+    ASSERT_EQ(map.bucket_count(), 1);
+
+    map.insert({2, 2});
+    map.insert({2, 3});
+    map.insert({2, 4});
+    ASSERT_EQ(map.size(), 1);
+    ASSERT_EQ(map.bucket_count(), 1);
+    map.erase(2);
+    ASSERT_EQ(map.size(), 0);
+    ASSERT_EQ(map.bucket_count(), 1);
 }

@@ -4,6 +4,7 @@ add_subdirectory(vector)
 add_subdirectory(logger)
 add_subdirectory(sharedptr)
 add_subdirectory(uniqueptr)
+add_subdirectory(tsqueue)
 
 add_library(CppLib INTERFACE)
 target_link_libraries(CppLib INTERFACE 
@@ -13,4 +14,5 @@ target_link_libraries(CppLib INTERFACE
     LoggerLib
     SharedPtrLib
     UniquePtrLib
+    TsQueueLib
 )

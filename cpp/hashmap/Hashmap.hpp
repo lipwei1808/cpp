@@ -89,7 +89,7 @@ public:
 
     Hashmap() = default;
     Hashmap(std::initializer_list<value_type> lst) {
-        LOG_TRACE("Initializer list constructor");
+        LOG_DEBUG("Initializer list constructor");
         rehash(lst.size());
         for (const value_type& item: lst) {
             insert(item);
@@ -98,7 +98,7 @@ public:
     Hashmap(const Hashmap& other): maxLoadFactor(other.maxLoadFactor) {
         rehash(other.mBucketCount);
         for (const auto& el: other) {
-            LOG_TRACE("start: %d, end: %d", el.first, el.second);
+            LOG_DEBUG("start: %d, end: %d", el.first, el.second);
             insert(el);
         }
     }
@@ -110,29 +110,25 @@ public:
     }
 
     V& at(const K& key) {
-        size_t hashIdx = std::hash<K>()(key);
-        size_t bucketIdx = hashIdx % mBucketCount;
-        for (auto& item: mStore[bucketIdx]) {
-            if (item.first == key) {
-                return item.second;
-            }
+        auto it = find(key);
+        if (it == end()) {
+            throw std::out_of_range("invalid key");
         }
-        throw std::out_of_range("invalid key");
+        return it->second;
     } 
 
     std::pair<Iterator<false>, bool> insert(const value_type& value) {
-        LOG_TRACE("insert");
+        LOG_DEBUG("insert");
         if (mBucketCount == 0) {
             rehash(1);
         }
-        size_t hashIdx = std::hash<K>()(value.first);
-        size_t bucketIdx = hashIdx % mBucketCount;
+        size_t bucketIdx = hashKey(value.first, mBucketCount);
 
         // Check if key already exists and replace
         typename Bucket::iterator start = mStore[bucketIdx].begin();
         for (; start != mStore[bucketIdx].end(); start++) {
             if (start->first == value.first) {
-                LOG_TRACE("inserting key already present, overriding...");
+                LOG_DEBUG("inserting key already present, overriding...");
                 start->second = value.second;
                 break;
             }
@@ -144,7 +140,7 @@ public:
 
         if (mSize / mBucketCount >= maxLoadFactor) {
             rehash(mBucketCount * 2);
-            bucketIdx = hashIdx % mBucketCount;
+            bucketIdx = hashKey(value.first, mBucketCount);
         }
         start = mStore[bucketIdx].insert(mStore[bucketIdx].end(), value);
         mSize++;
@@ -153,42 +149,39 @@ public:
     }
 
     V& operator[](const K& key) {
-        size_t hashIdx = std::hash<K>()(key);
-        size_t bucketIdx = hashIdx % mBucketCount;
-        for (auto& item: mStore[bucketIdx]) {
-            if (item.first == key) {
-                return item.second;
-            }
+        LOG_DEBUG("operator[]");
+        auto it = find(key);
+        if (it != end()) {
+            return it->second;
         }
+        LOG_DEBUG("operator[] no item found, insert default");
         auto res = insert({key, V{}});
         return res.first->second;
     }
 
-    // TODO: unit tests
     iterator find(const K& key) {
-        size_t hashIdx = std::hash<K>()(key);
-        size_t bucketIdx = hashIdx % mBucketCount;
-        for (auto start = mStore[bucketIdx].begin(); start != mStore[bucketIdx].end(); start++) {
-            if (start->first == key) {
-                return Iterator<false>{start, mStore, bucketIdx, mBucketCount};
+        LOG_DEBUG("find");
+        size_t bucketIdx = hashKey(key, mBucketCount);
+        if (bucketIdx < mBucketCount) {
+            for (auto start = mStore[bucketIdx].begin(); start != mStore[bucketIdx].end(); start++) {
+                if (start->first == key) {
+                    return Iterator<false>{start, mStore, bucketIdx, mBucketCount};
+                }
             }
         }
         return end();
     }
 
-    // TODO: unit tests
     bool contains(const K& key) {
         return find(key) != end();
     }
 
-    // TODO: unit tests
     size_t erase(const K& key) {
         iterator it = find(key);
         if (it == end()) {
             return 0;
         }
-        size_t hashIdx = std::hash<K>()(key);
-        size_t bucketIdx = hashIdx % mBucketCount;
+        size_t bucketIdx = hashKey(key, mBucketCount);
         mStore[bucketIdx].erase(it.getBucketIterator());
         mSize--;
         return 1;
@@ -203,12 +196,11 @@ public:
     }
 
     void rehash(size_t count) {
-        LOG_TRACE("rehash to %zu", count);
+        LOG_DEBUG("rehash to %zu", count);
         Bucket* newStore = new Bucket[count];
         for (size_t i = 0; i < mBucketCount; i++) {
             for (const value_type& val: mStore[i]) {
-                size_t hashIdx = std::hash<K>()(val.first);
-                size_t bucketIdx = hashIdx % count;
+                size_t bucketIdx = hashKey(val.first, count);
                 newStore[bucketIdx].insert(newStore[bucketIdx].end(), std::move(val));
             }
         }
@@ -258,6 +250,10 @@ public:
     }
 
 private:
+    size_t hashKey(const K& key, size_t bucketCount) {
+        size_t hashIdx = std::hash<K>()(key);
+        return hashIdx % bucketCount;
+    }
     Bucket* mStore = nullptr;
     size_t mBucketCount = 0;
     size_t mSize = 0;

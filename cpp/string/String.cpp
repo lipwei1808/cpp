@@ -6,11 +6,11 @@
 #include <cstring>
 
 String::String(): len(0), sso(false) {
-    LOG_TRACE("Default constructor");
+    LOG_DEBUG("Default constructor");
 }
 
 String::String(const char* s, size_t len) {
-    LOG_TRACE("Parameter char* constructor with len");
+    LOG_DEBUG("Parameter char* constructor with len");
     if (s == nullptr) {
         return;
     }
@@ -28,7 +28,7 @@ String::String(const char* s, size_t len) {
 }
 
 String::String(const char* s) {
-    LOG_TRACE("Parameter char* constructor");
+    LOG_DEBUG("Parameter char* constructor");
     if (s == nullptr) {
         return;
     }
@@ -46,7 +46,7 @@ String::String(const char* s) {
 }
 
 String::String(const String& str): len(str.len), sso(str.sso) {
-    LOG_TRACE("Copy constructor");
+    LOG_DEBUG("Copy constructor");
     if (sso) {
         std::memcpy(smallBuffer, str.smallBuffer, len);
         smallBuffer[len] = '\0';
@@ -58,7 +58,7 @@ String::String(const String& str): len(str.len), sso(str.sso) {
 }
 
 String::String(String&& str): ptr(str.ptr), len(str.len), sso(str.sso) {
-    LOG_TRACE("Move constructor");
+    LOG_DEBUG("Move constructor");
     if (sso) {
         std::memcpy(smallBuffer, str.smallBuffer, len);
         smallBuffer[len] = '\0';
@@ -68,14 +68,14 @@ String::String(String&& str): ptr(str.ptr), len(str.len), sso(str.sso) {
 }
 
 String& String::operator=(const String& str) {
-    LOG_TRACE("Copy assignment operator");
+    LOG_DEBUG("Copy assignment operator");
     String s{str};
     swap(s);
     return *this;
 }
 
 String& String::operator=(String&& str) {
-    LOG_TRACE("Move assignment operator");
+    LOG_DEBUG("Move assignment operator");
     String s{std::move(str)};
     swap(s);
     return *this;
@@ -87,13 +87,13 @@ String& String::append(const char* str) {
     }
 
     size_t sz = strlen(str);
-    LOG_TRACE("Append current len: %zu, append len: %zu", len, sz);
+    LOG_DEBUG("Append current len: %zu, append len: %zu", len, sz);
     if (sso) {
         if (sz + len <= SSO_SIZE) {
             std::memcpy(smallBuffer + len, str, sz);
             smallBuffer[len + sz] = '\0';
             len += sz;
-            LOG_TRACE("After append: %s", c_str());
+            LOG_DEBUG("After append: %s", c_str());
             return *this;
         }
         sso = false;
@@ -105,7 +105,7 @@ String& String::append(const char* str) {
     memcpy(ptr + len, str, sz);
     ptr[len + sz + 1] = '\0';
     len += sz;
-    LOG_TRACE("After append: %s", c_str());
+    LOG_DEBUG("After append: %s", c_str());
     return *this;
 }
 
@@ -138,7 +138,7 @@ size_t String::size() const {
 
 const char* String::c_str() const {
     // Handle case where smallBuffer could be garbage
-    LOG_TRACE("c_str len: %zu", len);
+    LOG_DEBUG("c_str len: %zu", len);
     if (len == 0) {
         return nullptr;
     }
@@ -169,7 +169,7 @@ String::Iterator String::end() {
     
 bool String::operator==(const char* str) const {
     size_t sz = strlen(str);
-    LOG_TRACE("Operator== char* str size: %zu, len: %zu", sz, len);
+    LOG_DEBUG("Operator== char* str size: %zu, len: %zu", sz, len);
     if (sz != len) {
         return false;
     }
@@ -179,7 +179,7 @@ bool String::operator==(const char* str) const {
 }
 
 bool String::operator==(const String& str) const {
-    LOG_TRACE("Operator== str size: %zu, len: %zu", str.len, len);
+    LOG_DEBUG("Operator== str size: %zu, len: %zu", str.len, len);
     if (str.len != len) {
         return false;
     }

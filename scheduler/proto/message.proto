@@ -7,6 +7,21 @@ enum MessageType {
     MESSAGE_TYPE_DATA =  2;
     MESSAGE_TYPE_HANDSHAKE_REQ = 3;
     MESSAGE_TYPE_HANDSHAKE_RES = 4;
+    MESSAGE_TYPE_TASK_REQ = 5;
+    MESSAGE_TYPE_TASK_RES = 6;
+}
+
+enum TaskType {
+    TASK_ONE = 1;
+    TASK_TWO = 2;
+}
+
+message Task {
+    required TaskType type = 1;
+}
+
+message TaskResponse {
+    required bool success = 1;
 }
 
 message HeartbeatData {

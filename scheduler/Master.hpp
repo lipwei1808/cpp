@@ -3,6 +3,7 @@
 #include "Distributor.hpp"
 #include "Hashmap.hpp"
 #include "Worker.hpp"
+#include "String.hpp"
 #include "UniquePtr.hpp"
 
 #include <barrier>
@@ -18,9 +19,11 @@ public:
     ~Master();
 
 private:
-    bool handleClient(int clientFd);
-    void handleWorker(int workerFd);
-    void handleDisconnect(int workerFd);
+    bool handle(int fd, const String& s);
+    bool handleClient(int clientFd, const Scheduler::Message& msg);
+    bool handleWorker(int workerFd, const Scheduler::Message& msg);
+    void handleDisconnect(int fd);
+    void handleDisconnectWorker(int workerFd);
     void handleNewConnection();
     bool handleHeartbeat(int workerFd);
     bool sendHandshakeResponse(int workerFd);

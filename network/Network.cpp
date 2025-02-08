@@ -49,3 +49,29 @@ int connectToHost(const char* hostname, const char* port) {
     return fd;
 }
 
+bool Send(int fd, const String& s) {
+    if (send(fd, s.c_str(), s.size(), 0) == -1) {
+        LOG_ERROR("Error sending data errno=%d, msg=%s", errno, strerror(errno));
+        return false;
+    }
+
+    return true;
+}
+
+bool Receive(int fd, String& s) {
+    char buffer[MAX_MESSAGE_SIZE];
+    ssize_t bytes = recv(fd, buffer, MAX_MESSAGE_SIZE, 0);
+    if (bytes == 0) {
+        LOG_INFO("workerFd=%d socket disconnected", fd);
+        return false;
+    }
+
+    if (bytes < 0) {
+        LOG_ERROR("Error sending data for socket=%d errno=%d, msg=%s", fd, errno, strerror(errno));
+        return false;
+    }
+
+    s = {buffer, static_cast<size_t>(bytes)};
+    return true;
+}
+

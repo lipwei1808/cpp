@@ -16,6 +16,7 @@ String::String(const char* s, size_t len) {
     }
     this->len = len;
     if (len <= SSO_SIZE) {
+        LOG_DEBUG("SSO is true, copying to sso buffer now. len=%zu", len);
         std::memcpy(smallBuffer, s, len);
         smallBuffer[len] = '\0';
         sso = true;
@@ -58,7 +59,7 @@ String::String(const String& str): len(str.len), sso(str.sso) {
 }
 
 String::String(String&& str): ptr(str.ptr), len(str.len), sso(str.sso) {
-    LOG_DEBUG("Move constructor");
+    LOG_DEBUG("Move constructor, sso=%d", sso);
     if (sso) {
         std::memcpy(smallBuffer, str.smallBuffer, len);
         smallBuffer[len] = '\0';
@@ -200,4 +201,12 @@ void String::swap(String& str) {
     std::swap(ptr, str.ptr);
     std::swap(sso, str.sso);
     std::swap(smallBuffer, str.smallBuffer);
+}
+
+// TODO: Unit tests!!
+std::string String::toStdString() const {
+    if (sso) {
+        return {smallBuffer, len};
+    }
+    return {ptr, len};
 }

@@ -4,6 +4,7 @@
 #include "message.pb.h"
 #include "UniquePtr.hpp"
 #include "HeartbeatMonitor.hpp"
+#include "Network.hpp"
 
 #include <arpa/inet.h>
 #include <cstring>
@@ -126,12 +127,19 @@ bool Master::run() {
             int rfd = eventList[i].ident;
             if (rfd == fd) {
                 handleNewConnection();
-            } else if (workerFds.contains(rfd)) {
-                handleWorker(rfd);
-            } else if (clientFds.contains(rfd)) {
-                handleClient(rfd);
-            } else {
-                LOG_ERROR("Received unknown FD=%d", rfd);
+                continue;
+            } 
+
+            String s;
+            if (!Receive(rfd, s)) {
+                LOG_ERROR("Error receiving data from fd=%d", rfd);
+                handleDisconnect(rfd);
+                continue;
+            }
+
+            if (!handle(rfd, s)) {
+                LOG_ERROR("Error handling data fd=%d", rfd);
+                handleDisconnect(rfd);
             }
         }
     }
@@ -139,47 +147,38 @@ bool Master::run() {
     barrier.arrive_and_wait();
     return true;
 }
+
+bool Master::handle(int fd, const String& s) {
+    Scheduler::Message message;
+    if (!message.ParseFromString(s.toStdString())) {
+        LOG_ERROR("Error deserializing mesage from fd=%d", fd);
+        return false;
+    }
+
+    bool res = true;
+    switch (message.type()) {
+        case (Scheduler::MessageType::MESSAGE_TYPE_HANDSHAKE_REQ): {
+            res = sendHandshakeResponse(fd);
+            break;
+        }
+        default: {
+            if (workerFds.contains(fd)) {
+                res = handleWorker(fd, message);
+            } else if (clientFds.contains(fd)) {
+                res = handleClient(fd, message);
+            } else {
+                res = false;
+            }
+        }
+    }
+    return res;
+}
  
-bool Master::handleClient(int clientFd) {
-    char buffer[MAX_MESSAGE_SIZE];
-    ssize_t bytes = recv(clientFd, buffer, MAX_MESSAGE_SIZE, 0);
-    if (bytes == 0) {
-        LOG_INFO("Client disconnected clientFd=%d", clientFd);
-        return false;
-    }
-
-    if (bytes < 0) {
-        LOG_ERROR("Error reveiving message. bytes=%zu", bytes);
-        return false;
-    }
-
-    LOG_TRACE("Master successfully received message from worker");
-
+bool Master::handleClient(int clientFd, const Scheduler::Message& msg) {
     return true;
 }
 
-void Master::handleWorker(int workerFd) {
-    char buffer[MAX_MESSAGE_SIZE];
-    ssize_t bytes = recv(workerFd, buffer, MAX_MESSAGE_SIZE, 0);
-    if (bytes == 0) {
-        LOG_INFO("workerFd=%d socket disconnected", workerFd);
-        handleDisconnect(workerFd);
-        return;
-    }
-
-    if (bytes < 0) {
-        handleDisconnect(workerFd);
-        LOG_ERROR("Error reveiving message. bytes=%zu", bytes);
-        return;
-    }
-    Scheduler::Message message;
-    if (!message.ParseFromString(std::string{buffer, static_cast<size_t>(bytes)})) {
-        handleDisconnect(workerFd);
-        LOG_ERROR("Error deserializing mesage from worker. fd=%d", workerFd);
-        return;
-    }
-
-    LOG_TRACE("Master successfully received message from worker");
+bool Master::handleWorker(int workerFd, const Scheduler::Message& message) {
     bool res = true;
     switch (message.type()) {
         case (Scheduler::MessageType::MESSAGE_TYPE_HEARTBEAT): {
@@ -199,36 +198,41 @@ void Master::handleWorker(int workerFd) {
         }
     }
 
-    if (!res) {
-        handleDisconnect(workerFd);
-        LOG_ERROR("Error in responding to message from worker=%d", workerFd);
-    }
-    return;
+    return res;
 }
 
-void Master::handleDisconnect(int workerFd) {
-    if (!workerFds.contains(workerFd)) {
-        LOG_ERROR("Attempting to disconnect an unknown worker fd=%d", workerFd);
+void Master::handleDisconnect(int fd) {
+    if (workerFds.contains(fd)) {
+        handleDisconnectWorker(fd);
+    } else {
+        LOG_ERROR("Attempting to disconnect an unknown worker fd=%d", fd);
         return;
     }
-    LOG_INFO("Disconnect workerFd=%d", workerFd);
+
     struct kevent kev;
-    EV_SET(&kev, workerFd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+    EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
     if (kevent(kq, &kev, 1, nullptr, 0, nullptr) == -1) {
-        LOG_ERROR("Error removing worker fd=%d from event list %d: %s", workerFd, errno, strerror(errno));
+        LOG_ERROR("Error removing socket fd=%d from event list %d: %s", fd, errno, strerror(errno));
     }
-    close(workerFd);
+    close(fd);
+}
+
+void Master::handleDisconnectWorker(int workerFd) {
+    LOG_INFO("Disconnect workerFd=%d", fd);
     heartbeatMonitor->disconnectWorker(workerFds.at(workerFd));
     workerFds.erase(workerFd);
 }
 
 bool Master::sendHandshakeResponse(int workerFd) {
-    if (!workerFds.contains(workerFd)) {
+    LOG_TRACE("Sending handshake response to workerfd=%d", workerFd);
+    if (workerFds.contains(workerFd)) {
+        LOG_ERROR("Handshake requested from a worker that has already shook hands! fd=%d", workerFd);
         return false;
     }
 
+    int id = workerFd;
     Scheduler::HeartbeatData hData;
-    hData.set_id(workerFds.at(workerFd));
+    hData.set_id(id);
     std::string serialized;
     if (!hData.SerializeToString(&serialized)) {
         LOG_ERROR("Error serializing heartbeat data workerFd=%d, workerId=%d", workerFd, workerFds.at(workerFd));
@@ -240,7 +244,7 @@ bool Master::sendHandshakeResponse(int workerFd) {
     msg.set_data(serialized);
 
     if (!msg.SerializeToString(&serialized)) {
-        LOG_ERROR("Error serializing msg heartbeat data workerFd=%d, workerId=%d", workerFd, workerFds.at(workerFd));
+        LOG_ERROR("Error serializing msg heartbeat data workerFd=%d, workerId=%d", workerFd, id);
         return false;
     }
 
@@ -248,6 +252,9 @@ bool Master::sendHandshakeResponse(int workerFd) {
         LOG_ERROR("Error sending heartbeat %d: %s", errno, strerror(errno));
         return false;
     }
+    distributor.addWorker(workerFd);
+    workerFds.insert({workerFd, id});
+    heartbeatMonitor->addWorker(id);
     return true;
 }
 
@@ -283,9 +290,6 @@ void Master::handleNewConnection() {
         return;
     }
     LOG_INFO("Accepted new connection fd=%d", newFd);
-    distributor.addWorker(newFd);
-    workerFds.insert({newFd, newFd});
-    heartbeatMonitor->addWorker(newFd);
 }
 
 bool Master::handleTaskResponse(int workerFd, const std::string& data) {

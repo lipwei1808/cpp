@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iterator>
+#include <string>
 
 #define SSO_SIZE 128
 
@@ -50,6 +51,8 @@ public:
 
     bool operator==(const char* str) const; 
     bool operator==(const String& str) const; 
+
+    std::string toStdString() const; 
 
     ~String(); 
 

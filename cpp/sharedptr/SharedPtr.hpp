@@ -1,58 +1,44 @@
 #pragma once
 
+#include <atomic>
+#include "Logger.hpp"
+
+// TODO: Is not thread safe currently
 template <typename T>
 class SharedPtr {
 public:
-    SharedPtr(): ptr(nullptr), refCount(new unsigned int(0)) {}
-    SharedPtr(T* ptr): ptr(ptr) {
-        if (ptr) {
-            refCount = new unsigned int(1);
-        }
+    SharedPtr(T* ptr): ptr(ptr), refCount(new std::atomic<unsigned int>(1)) {
+        LOG_INFO("Default Constructor: %p, %p", ptr, refCount);
     }
     SharedPtr(const SharedPtr& other): ptr(other.ptr), refCount(other.refCount) {
-        if (ptr) {
-            (*refCount)++;
-        }
+        LOG_DEBUG("Copy Constructor other ptr: %p, other refCount: %p", other.ptr, other.refCount);
+        refCount->fetch_add(1, std::memory_order::relaxed);
     }
-    SharedPtr(SharedPtr&& other) {
+    SharedPtr(SharedPtr&& other): refCount(other.refCount) {
+        LOG_DEBUG("Move Constructor other ptr: %p, other refCount: %p", other.ptr, other.refCount);
         ptr = other.ptr;
-        refCount = other.refCount;
         other.ptr = nullptr;
-        other.refCount = nullptr;
     }
 
-    T& operator*() {
-        return *ptr;
-    }
-
-    T* operator->() {
-        return ptr;
-    }
 
     unsigned int get_count() const {
-        return *refCount;
+        return refCount->load(std::memory_order::acquire);
     }
 
-    T* get() const {
-        return ptr;
-    }
+    T* get() const { return ptr; }
+    T& operator*() { return *ptr; }
+    T* operator->() { return ptr; }
 
     ~SharedPtr() {
-        cleanup();
+        unsigned int oldCount = refCount->fetch_sub(1, std::memory_order_acq_rel);
+        if (oldCount == 1) {
+            if (ptr) 
+                delete ptr;
+            delete refCount;
+        }
     }
 
 private:
-    void cleanup() {
-        if (*refCount == 1) {
-            if (ptr) {
-                delete ptr;
-            }
-            delete refCount;
-        } else {
-            (*refCount)--;
-        }
-    }
-
     T* ptr = nullptr;
-    unsigned int* refCount = nullptr;
+    std::atomic<unsigned int>* refCount = nullptr;
 };

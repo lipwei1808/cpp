@@ -5,7 +5,7 @@
 #include <utility>
 #include <cstring>
 
-String::String(): len(0), sso(false) {
+String::String(): len(0), sso(true) {
     LOG_DEBUG("Default constructor");
 }
 
@@ -88,9 +88,10 @@ String& String::append(const char* str) {
     }
 
     size_t sz = strlen(str);
-    LOG_DEBUG("Append current len: %zu, append len: %zu", len, sz);
+    LOG_DEBUG("Append current len: %zu, append len: %zu, sso: %d", len, sz, sso);
     if (sso) {
         if (sz + len <= SSO_SIZE) {
+            LOG_DEBUG("HI\b");
             std::memcpy(smallBuffer + len, str, sz);
             smallBuffer[len + sz] = '\0';
             len += sz;
@@ -104,7 +105,7 @@ String& String::append(const char* str) {
     ptr = new char[len + sz + 1];
     memcpy(ptr, existingPtr, len);
     memcpy(ptr + len, str, sz);
-    ptr[len + sz + 1] = '\0';
+    ptr[len + sz] = '\0';
     len += sz;
     LOG_DEBUG("After append: %s", c_str());
     return *this;

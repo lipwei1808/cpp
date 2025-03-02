@@ -10,7 +10,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 add_compile_definitions(NDEBUG)
 
 # Option to set the logging level. Default is ERROR_LEVEL.
-option(LOG_LEVEL_OPTION "Set the log level (0=NO_LOG, 1=ERROR_LEVEL, 2=INFO_LEVEL, 3=TRACE_LEVEL)" 1)
+option(LOG_LEVEL_OPTION "Set the log level (0=NO_LOG, 1=ERROR_LEVEL, 2=INFO_LEVEL, 3=TRACE_LEVEL)" ON)
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 
 # Define the LOG_LEVEL based on the option
 if(LOG_LEVEL_OPTION EQUAL 0)
@@ -30,6 +32,15 @@ elseif(LOG_LEVEL_OPTION EQUAL 4)
     add_compile_definitions(LOG_LEVEL=0x04)
 else()
     message(STATUS "Using default Log Level INFO")
+endif()
+
+if (ENABLE_ASAN)
+add_compile_options(-fsanitize=address,undefined)
+add_link_options(-fsanitize=address,undefined)
+endif()
+if (ENABLE_TSAN)
+add_compile_options(-fsanitize=thread)
+add_link_options(-fsanitize=thread)
 endif()
 
 # Google benchmark

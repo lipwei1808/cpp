@@ -56,7 +56,7 @@ TEST(StringTest, AssignmentOperators) {
 
 }
 
-TEST(StringTest, Append) {
+TEST(StringTest, AppendWithSSO) {
     const char arr[] = "Hello world";
     
     // Append
@@ -78,8 +78,29 @@ TEST(StringTest, Append) {
     String s3;
     s2.append(s3);
     ASSERT_TRUE(s2 == "reset");
+}
 
-    // Operator+=
+TEST(StringTest, AppendNotSSO) {
+    std::string ss;
+    for (int i = 0; i < 128; i++) {
+        ss += "mary";
+    }
+
+    String s4{ss.c_str()};
+    ASSERT_TRUE(s4 == ss.c_str());
+    s4.append("test");
+    ss += "test";
+    ASSERT_TRUE(s4 == ss.c_str());
+
+    s4.clear();
+    s4.append("short");
+    ASSERT_TRUE(s4 == "short");
+}
+
+TEST(StringTest, OperatorAppend) {
+    const char arr[] = "Hello world";
+    String s1;
+
     s1 = arr;
     s1 += "";
     ASSERT_TRUE(s1 == arr);
@@ -87,7 +108,7 @@ TEST(StringTest, Append) {
     s1 += "Sx";
     ASSERT_TRUE(s1 == "Hello worldSx");
     
-    s2 = ", new man!";
+    String s2 = ", new man!";
     s1 += s2;
     ASSERT_TRUE(s1 == "Hello worldSx, new man!");
 
@@ -95,7 +116,7 @@ TEST(StringTest, Append) {
     ASSERT_TRUE(s2 == ", new man!, new man!");
 
     s2 = "reset";
-    s3 = "";
+    String s3 = "";
     s2 += s3;
     ASSERT_TRUE(s2 == "reset");
 }

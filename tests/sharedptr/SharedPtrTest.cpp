@@ -2,7 +2,6 @@
 #include <thread>
 
 #include "SharedPtr.hpp"
-#include "Logger.hpp"
 
 void copy_into_thread(int k, SharedPtr<int> ptr)
 {
@@ -10,13 +9,12 @@ void copy_into_thread(int k, SharedPtr<int> ptr)
         return;
 
     std::thread([](int k, SharedPtr<int> ptr) {
-        LOG_TRACE("%d: ptr_val: %d", k, *ptr);
-        copy_into_thread(k, ptr);
+       copy_into_thread(k, ptr);
     }, k - 1, ptr).detach();
 }
 
-TEST(SharedPtrTest, Constructor) {
 
+TEST(SharedPtrTest, Constructor) {
     SharedPtr<int> x = SharedPtr(new int(888));
     copy_into_thread(10, x);
 }

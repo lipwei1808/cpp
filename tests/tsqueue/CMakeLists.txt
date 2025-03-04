@@ -1,6 +1,9 @@
 add_executable(TsQueueTest TsQueueTest.cpp)
+add_executable(FineGrainedTsQueueTest FineGrainedTsQueueTest.cpp)
 
 target_link_libraries(TsQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
+target_link_libraries(FineGrainedTsQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(TsQueueTest)
+gtest_discover_tests(FineGrainedTsQueueTest)

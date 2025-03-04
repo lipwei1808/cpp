@@ -1,12 +1,31 @@
 #pragma once
 
+#include "Logger.hpp"
+
+// TODO: Write tests
 template <typename T>
 class UniquePtr {
 public:
-    UniquePtr(): ptr(nullptr) {}
-    UniquePtr(T* ptr): ptr(ptr) {}
-    UniquePtr(const UniquePtr& ptr) = delete;
-    UniquePtr(UniquePtr&& ptr) = delete;
+    UniquePtr(): ptr(nullptr) {
+        LOG_DEBUG("Default constructor: %p", this);
+    }
+    UniquePtr(T* ptr): ptr(ptr) {
+        LOG_DEBUG("Parameter constructor: %p, ptr: %p", this, ptr);
+    }
+    UniquePtr(const UniquePtr& other) = delete;
+    UniquePtr(UniquePtr&& other): ptr{other.ptr} {
+        other.ptr = nullptr;
+    }
+
+    UniquePtr& operator=(UniquePtr&& other) {
+        LOG_DEBUG("operator= %p", other.ptr);
+        if (this != &other) {
+            reset(other.ptr);
+            other.ptr = nullptr;
+        }
+        return *this;
+    }
+
     T& operator*() {
         return *ptr;
     }
@@ -37,9 +56,7 @@ public:
     }
 
     ~UniquePtr() {
-        if (ptr) {
-            delete ptr;
-        }
+        delete ptr;
     }
 
 private:

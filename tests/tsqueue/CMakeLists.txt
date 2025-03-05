@@ -1,9 +1,9 @@
-add_executable(TsQueueTest TsQueueTest.cpp)
-add_executable(FineGrainedTsQueueTest FineGrainedTsQueueTest.cpp)
+add_executable(ITsQueueTest ITsQueueTest.cpp)
+add_executable(LockFreeQueueTest LockFreeQueueTest.cpp)
 
-target_link_libraries(TsQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
-target_link_libraries(FineGrainedTsQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
+target_link_libraries(ITsQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
+target_link_libraries(LockFreeQueueTest PRIVATE TsQueueLib LoggerLib gtest_main)
 
 include(GoogleTest)
-gtest_discover_tests(TsQueueTest)
-gtest_discover_tests(FineGrainedTsQueueTest)
+gtest_discover_tests(ITsQueueTest)
+gtest_discover_tests(LockFreeQueueTest)

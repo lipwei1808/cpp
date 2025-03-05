@@ -19,13 +19,13 @@ void Distributor::start() {
 void Distributor::svc() {
     while (!shutdown) {
         int workerFd;
-        bool success = workerQueue.consumeSync(workerFd);
+        bool success = workerQueue.waitAndPop(workerFd);
         if (!success || shutdown) {
             break;
         }
 
         Scheduler::Task task;
-        success = taskQueue.consumeSync(task);
+        success = taskQueue.waitAndPop(task);
         if (!success || shutdown) {
             break;
         }

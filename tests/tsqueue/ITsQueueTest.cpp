@@ -1,32 +1,40 @@
 #include <gtest/gtest.h>
 #include <thread>
 
+#include "TsQueue.hpp"
 #include "FineGrainedTsQueue.hpp"
 
-TEST(FineGrainedTsQueue, Basic) {
-    FineGrainedTsQueue<int> q;
-    q.push(1);
-    SharedPtr<int> res = q.waitAndPop();
+template <typename T>
+class ITsQueueTest: public testing::Test {
+public:
+    T queueImpl;
+};
+
+using IntQueueImpls = ::testing::Types<TsQueue<int>, FineGrainedTsQueue<int>>;
+TYPED_TEST_SUITE(ITsQueueTest, IntQueueImpls);
+
+TYPED_TEST(ITsQueueTest, Basic) {
+    this->queueImpl.push(1);
+    SharedPtr<int> res = this->queueImpl.waitAndPop();
     ASSERT_EQ(*res, 1);
-    SharedPtr<int> res2 = q.tryPop();
+    SharedPtr<int> res2 = this->queueImpl.tryPop();
     EXPECT_TRUE(res2.get() == nullptr);
 
-    q.push(2);
-    res = q.tryPop();
+    this->queueImpl.push(2);
+    res = this->queueImpl.tryPop();
     EXPECT_TRUE(*res == 2);
 }
 
-TEST(FineGrainedTsQueue, SingleThread) {
-    FineGrainedTsQueue<int> q;
+TYPED_TEST(ITsQueueTest, SingleThread) {
     int times = 100000;
     for (int i = 1; i <= times * 4; i++) {
-        q.push(i);
+        this->queueImpl.push(i);
     }
 
     long long sum{};
     for (int i = 0; i < times; i++) {
         int val;
-        ASSERT_TRUE(q.tryPop(val));
+        ASSERT_TRUE(this->queueImpl.tryPop(val));
         sum += val;
     }
     long long expected = (times + 1LL) * (times / 2LL);
@@ -34,7 +42,7 @@ TEST(FineGrainedTsQueue, SingleThread) {
 
     long long sum1{};
     for (int i = 0; i < times; i++) {
-        SharedPtr<int> res = q.tryPop();
+        SharedPtr<int> res = this->queueImpl.tryPop();
         ASSERT_TRUE(res.get() != nullptr);
         sum1 += *res;
     }
@@ -45,7 +53,7 @@ TEST(FineGrainedTsQueue, SingleThread) {
     long long sum2{};
     for (int i = 0; i < times; i++) {
         int val;
-        q.waitAndPop(val);
+        this->queueImpl.waitAndPop(val);
         sum2 += val;
     }
     expected = (times * 2LL + 1LL + times * 3LL) * (times / 2LL);
@@ -53,7 +61,7 @@ TEST(FineGrainedTsQueue, SingleThread) {
 
     long long sum3{};
     for (int i = 0; i < times; i++) {
-        SharedPtr<int> res = q.waitAndPop();
+        SharedPtr<int> res = this->queueImpl.waitAndPop();
         ASSERT_TRUE(res.get() != nullptr);
         sum3 += *res;
     }
@@ -64,34 +72,12 @@ TEST(FineGrainedTsQueue, SingleThread) {
     ASSERT_EQ(sum1 + sum2 + sum3 + sum, expected);
 }
 
-TEST(FineGrainedTsQueue, CustomStruct) {
-    struct Foo {
-        int x;
-        long long y;
-        char z;
-    };
-
-    FineGrainedTsQueue<Foo> q;
-    for (int i = 0; i < 10; i++) {
-        char c = i + '0';
-        Foo f{i, i, c};
-        q.push(f);
-    }
-    for (int i = 0; i < 10; i++) {
-        Foo res;
-        q.tryPop(res);
-
-        ASSERT_EQ(res.x, i);
-        ASSERT_EQ(res.y, i);
-        ASSERT_EQ(res.z, i + '0');
-    }
-}
-
+template <typename Queue>
 void multiThreadProducerConsumer(
+        Queue& q,
         std::function<void(long long& sum,
                            int consumerAmt,
-                           FineGrainedTsQueue<int>& q)> consumerFn) {
-    FineGrainedTsQueue<int> q;
+                           Queue& q)> consumerFn) {
     int producerAmt = 150000;
     int consumerAmt = 100000;
     auto producerFn = [&]() {
@@ -121,52 +107,52 @@ void multiThreadProducerConsumer(
 
 }
 
-TEST(FineGrainedTsQueue, MultithreadWaitAndPopCopy) {
+TYPED_TEST(ITsQueueTest, MultithreadWaitAndPopCopy) {
     auto consumerFn = [&](long long& sum,
                           int consumerAmt,
-                          FineGrainedTsQueue<int>& q) {
+                          TypeParam& q) {
         for (int i = 0; i < consumerAmt; i++) {
             int val;
-            q.waitAndPop(val);
+            this->queueImpl.waitAndPop(val);
             sum += val;
         }
     };
-    multiThreadProducerConsumer(consumerFn);
+    multiThreadProducerConsumer<TypeParam>(this->queueImpl, consumerFn);
 }
 
 
-TEST(FineGrainedTsQueue, MultithreadWaitAndPopPointer) {
+TYPED_TEST(ITsQueueTest, MultithreadWaitAndPopPointer) {
     auto consumerFn = [&](long long& sum,
                           int consumerAmt,
-                          FineGrainedTsQueue<int>& q) {
+                          TypeParam& q) {
         for (int i = 0; i < consumerAmt; i++) {
-            SharedPtr<int> val = q.waitAndPop();
+            SharedPtr<int> val = this->queueImpl.waitAndPop();
             sum += *val;
         }
     };
-    multiThreadProducerConsumer(consumerFn);
+    multiThreadProducerConsumer<TypeParam>(this->queueImpl, consumerFn);
 }
 
-TEST(FineGrainedTsQueue, MultithreadTryPopCopy) {
+TYPED_TEST(ITsQueueTest, MultithreadTryPopCopy) {
     auto consumerFn = [&](long long& sum,
                           int consumerAmt,
-                          FineGrainedTsQueue<int>& q) {
+                          TypeParam& q) {
         for (int i = 0; i < consumerAmt; i++) {
             int val;
-            while (!q.tryPop(val)) {}
+            while (!this->queueImpl.tryPop(val)) {}
             sum += val;
         }
     };
-    multiThreadProducerConsumer(consumerFn);
+    multiThreadProducerConsumer<TypeParam>(this->queueImpl, consumerFn);
 }
 
-TEST(FineGrainedTsQueue, MultithreadTryPopPointer) {
+TYPED_TEST(ITsQueueTest, MultithreadTryPopPointer) {
     auto consumerFn = [&](long long& sum,
                           int consumerAmt,
-                          FineGrainedTsQueue<int>& q) {
+                          TypeParam& q) {
         for (int i = 0; i < consumerAmt; i++) {
             while (true) {
-                SharedPtr<int> res = q.tryPop();
+                SharedPtr<int> res = this->queueImpl.tryPop();
                 if (res.get() != nullptr) {
                     sum += *res;
                     break;
@@ -174,5 +160,37 @@ TEST(FineGrainedTsQueue, MultithreadTryPopPointer) {
             }
         }
     };
-    multiThreadProducerConsumer(consumerFn);
+    multiThreadProducerConsumer<TypeParam>(this->queueImpl, consumerFn);
 }
+
+struct Foo {
+    int x;
+    long long y;
+    char z;
+};
+
+template <typename T>
+class ITsQueueCustomStructTest: public testing::Test {
+public:
+    T queueImpl;
+};
+
+using CustomStructQueueImpls = ::testing::Types<TsQueue<Foo>, FineGrainedTsQueue<Foo>>;
+TYPED_TEST_SUITE(ITsQueueCustomStructTest, CustomStructQueueImpls);
+
+TYPED_TEST(ITsQueueCustomStructTest, CustomStruct) {
+    for (int i = 0; i < 10; i++) {
+        char c = i + '0';
+        Foo f{i, i, c};
+        this->queueImpl.push(f);
+    }
+    for (int i = 0; i < 10; i++) {
+        Foo res;
+        this->queueImpl.tryPop(res);
+
+        ASSERT_EQ(res.x, i);
+        ASSERT_EQ(res.y, i);
+        ASSERT_EQ(res.z, i + '0');
+    }
+}
+

@@ -13,19 +13,28 @@ public:
     }
 
     std::optional<int> tryPop() {
-        GenNode headPtr = head.load();
+        // Synchronises with tryPop (head.compare_exchange_weak(...))
+        GenNode headPtr = head.load(std::memory_order::acquire);
         while (true) {
-            Node* newHead = headPtr.ptr->next.load();
+            // Synchronises with push (oldDummy->next.store)
+            Node* newHead = headPtr.ptr->next.load(std::memory_order::acquire);
             if (newHead == nullptr) {
                 return std::nullopt;
             }
 
             GenNode newHeadPtr{newHead, headPtr.counter + 1};
-            if (head.compare_exchange_weak(headPtr, newHeadPtr)) {
+
+            // Synchronises with tryPop (head.load(...))
+            // Needs to release the memory else there could
+            // be a race between headPtr.ptr (read) and
+            // a write in getNewNode(...)
+            if (head.compare_exchange_weak(headPtr, newHeadPtr,
+                                           std::memory_order::acq_rel)) {
                 break;
             }
         }
         int res{headPtr.ptr->data};
+        recycleNode(headPtr.ptr);
         return res;
     }
 
@@ -33,14 +42,16 @@ public:
     // 2. Exchange new and old dummy node
     // 3. Write the data into the old dummy node
     void push(int val) {
-        Node* newDummy = new Node{};
+        Node* newDummy = getNewNode();
+        newDummy->next.store(nullptr);
         Node* oldDummy = tail.exchange(newDummy);
         oldDummy->data = val;
-        oldDummy->next.store(newDummy);
+        // Synchronises with tryPop (headPtr.ptr->next.load)
+        oldDummy->next.store(newDummy, std::memory_order::release);
     }
 
     ~LockFreeQueue() {
-        GenNode headPtr = head.load();
+        GenNode headPtr = head.load(std::memory_order::relaxed);
         Node* cur = headPtr.ptr;
         while (cur) {
             Node* nxt = cur->next;
@@ -48,7 +59,7 @@ public:
             cur = nxt;
         }
 
-        GenNode stackPtr = stackTop.load();
+        GenNode stackPtr = stackTop.load(std::memory_order::relaxed);
         cur = stackPtr.ptr;
         while (cur) {
             Node* nxt = cur->next;
@@ -60,16 +71,18 @@ public:
 private:
     struct Node;
     Node* getNewNode() {
-        GenNode oldTop = stackTop.load();
+        GenNode oldTop = stackTop.load(std::memory_order::relaxed);
         while (true) {
             Node* ptr = oldTop.ptr;
             if (ptr == nullptr) {
                 return new Node{};
             }
 
-            Node* next = ptr->next.load();
+            // Synchronises with recycleNode (val->next.store(...))
+            Node* next = ptr->next.load(std::memory_order::acquire);
             GenNode newTop{next, oldTop.counter + 1};
-            if (stackTop.compare_exchange_weak(oldTop, newTop)) {
+            if (stackTop.compare_exchange_weak(oldTop, newTop,
+                                               std::memory_order::relaxed)) {
                 break;
             }
         }
@@ -78,11 +91,17 @@ private:
     }
 
     void recycleNode(Node* val) {
-        GenNode oldTop = stackTop.load();
+        GenNode oldTop = stackTop.load(std::memory_order::relaxed);
         while (true) {
-            val->next.store(oldTop.ptr);
+            // Synchronises with getNewNode (ptr->next.load)
+            // Needs to release the current view of memory for
+            // the load if not subsequent uses of that node in
+            // getNewNode could cause a data race when someone 
+            // wishes to read the node value previously
+            val->next.store(oldTop.ptr, std::memory_order::release);
             GenNode newTop{val, oldTop.counter + 1};
-            if (stackTop.compare_exchange_weak(oldTop, newTop)) {
+            if (stackTop.compare_exchange_weak(oldTop, newTop,
+                                               std::memory_order::relaxed)) {
                 break;
             }
         }

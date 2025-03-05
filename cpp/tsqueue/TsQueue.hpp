@@ -1,21 +1,23 @@
 #pragma once
 
+#include "ITsQueue.hpp"
 #include "Logger.hpp"
+#include "SharedPtr.hpp"
 
 #include <condition_variable>
 #include <queue>
 #include <mutex>
 
 template <typename T>
-class TsQueue {
+class TsQueue: public ITsQueue<T> {
 public:
-    void push(const T& val) {
+    void push(T val) override {
         std::unique_lock<std::mutex> lock(m);
-        q.push(val);
+        q.push(std::move(val));
         cv.notify_one();
     }
 
-    bool consumeSync(T& item) {
+    bool waitAndPop(T& item) override {
         bool success = true;
         std::unique_lock<std::mutex> lock(m);
         counter++;
@@ -34,6 +36,48 @@ public:
         LOG_DEBUG("After consume. size=%zu", size());
         return true;
     }
+
+    SharedPtr<T> waitAndPop() override {
+        bool success = true;
+        std::unique_lock<std::mutex> lock(m);
+        counter++;
+        cv.wait(lock, [this]() { return !empty() || shutdown; });
+        if (shutdown) {
+            success = false;
+            counter--;
+            return {};
+        }
+
+        SharedPtr<T> res{new T(std::move(q.front()))};
+        q.pop();
+        counter--;
+        cv.notify_one();
+        LOG_DEBUG("After consume. size=%zu", size());
+        return res;
+       
+    } 
+
+    bool tryPop(T& val) override {
+        std::unique_lock lock(m);
+        if (empty()) {
+            return false;
+        }
+
+        val = std::move(q.front());
+        q.pop();
+        return true;
+    }
+
+    SharedPtr<T> tryPop() override {
+        std::unique_lock lock(m);
+        if (empty()) {
+            return {};
+        }
+
+        SharedPtr<T> res{new T{std::move(q.front())}};
+        q.pop();
+        return res;
+    };
 
     bool empty() const {
         return q.empty();

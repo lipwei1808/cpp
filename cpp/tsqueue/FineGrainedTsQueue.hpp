@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ITsQueue.hpp"
 #include "SharedPtr.hpp"
 #include "UniquePtr.hpp"
 #include "Logger.hpp"
@@ -8,7 +9,7 @@
 #include <mutex>
 
 template <typename T>
-class FineGrainedTsQueue {
+class FineGrainedTsQueue: public ITsQueue<T> {
     struct Node;
 public:
     FineGrainedTsQueue(): head{new Node{}}, tail{head.get()} {
@@ -16,7 +17,7 @@ public:
     }
 
     // Pop from head
-    SharedPtr<T> tryPop() {
+    SharedPtr<T> tryPop() override {
         LOG_DEBUG("tryPop, return shared ptr");
         std::lock_guard lk{headMutex};
         if (head.get() == getTail()) {
@@ -26,7 +27,7 @@ public:
         return oldHead->val;
     }
 
-    bool tryPop(T& val) {
+    bool tryPop(T& val) override {
         std::lock_guard lk{headMutex};
         if (head.get() == getTail()) {
             return {};
@@ -40,7 +41,7 @@ public:
         return true;
     }
 
-    SharedPtr<T> waitAndPop() {
+    SharedPtr<T> waitAndPop() override {
         LOG_DEBUG("waitAndPop, return shared ptr");
         std::unique_lock lk{headMutex};
         cv.wait(lk, [this]() { return head.get() != getTail(); });
@@ -49,15 +50,16 @@ public:
         return oldHead->val;
     }
 
-    void waitAndPop(T& val) {
+    bool waitAndPop(T& val) override {
         std::unique_lock lk{headMutex};
         cv.wait(lk, [this]() { return head.get() != getTail(); });
         val = std::move(*head->val);
         popHead();
+        return true;
     }
 
     // Push to tail
-    void push(T val) {
+    void push(T val) override {
         LOG_DEBUG("push");
         SharedPtr<T> valPtr{new T{std::move(val)}};
         UniquePtr<Node> newDummy{new Node{}};

@@ -18,7 +18,7 @@ public:
     }
 
     UniquePtr& operator=(UniquePtr&& other) {
-        LOG_DEBUG("operator= %p", other.ptr);
+        LOG_DEBUG("operator= ptr=%p other.ptr=%p", ptr, other.ptr);
         if (this != &other) {
             reset(other.ptr);
             other.ptr = nullptr;
@@ -39,9 +39,7 @@ public:
     }
 
     void reset(T* newPtr) {
-        if (ptr) {
-            delete ptr;
-        }
+        delete ptr;
         ptr = newPtr;
     }
 

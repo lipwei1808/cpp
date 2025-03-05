@@ -52,11 +52,7 @@ public:
     }
 
     T* get() const { return ptr; }
-    T& operator*() {
-        LOG_DEBUG("Deref");
-        return *ptr;
-        LOG_DEBUG("Deref end");
-    }
+    T& operator*() { return *ptr; }
     T* operator->() { return ptr; }
 
     ~SharedPtr() {
@@ -65,7 +61,6 @@ public:
 
 private:
     void release() {
-        LOG_DEBUG("Release");
         if (!refCount) return;
         unsigned int oldCount = refCount->fetch_sub(1, std::memory_order_acq_rel);
         if (oldCount == 1) {

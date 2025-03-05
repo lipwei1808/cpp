@@ -5,6 +5,7 @@ add_subdirectory(logger)
 add_subdirectory(sharedptr)
 add_subdirectory(uniqueptr)
 add_subdirectory(tsqueue)
+add_subdirectory(tslist)
 
 add_library(CppLib INTERFACE)
 target_link_libraries(CppLib INTERFACE 
